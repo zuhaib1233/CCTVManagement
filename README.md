@@ -1,4 +1,4 @@
-# 📹 Multi-Camera CCTV Surveillance & Operations System
+# Multi-Camera CCTV Surveillance & Operations System
 
 [![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%209.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![ASP.NET Core](https://img.shields.io/badge/ASP.NET%20Core-MVC%20%26%20Web%20API-512BD4?logo=dotnet)](https://learn.microsoft.com/en-us/aspnet/core/)
@@ -11,22 +11,22 @@ A production-ready **24/7 Multi-Camera IP Surveillance & Operations Platform** b
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
-1. [Problem Statement & System Architecture](#-problem-statement--system-architecture)
-2. [Core Features](#-core-features)
-3. [Technology Stack & Libraries](#-technology-stack--libraries)
-4. [Project Directory Structure](#-project-directory-structure)
-5. [Prerequisites](#-prerequisites)
-6. [Step-by-Step Installation & Setup](#-step-by-step-installation--setup)
-7. [MediaMTX Configuration (`mediamtx.yml`)](#-mediamtx-configuration-mediamtxyml)
-8. [REST API Documentation](#-rest-api-documentation)
-9. [Hardware Troubleshooting & Imou Engineering Notes](#-hardware-troubleshooting--imou-engineering-notes)
-10. [Author](#-author)
+1. [Problem Statement & System Architecture](#problem-statement--system-architecture)
+2. [Core Features](#core-features)
+3. [Technology Stack & Libraries](#technology-stack--libraries)
+4. [Project Directory Structure](#project-directory-structure)
+5. [Prerequisites](#prerequisites)
+6. [Step-by-Step Installation & Setup](#step-by-step-installation--setup)
+7. [MediaMTX Configuration](#mediamtx-configuration)
+8. [REST API Documentation](#rest-api-documentation)
+9. [Hardware Troubleshooting & Imou Engineering Notes](#hardware-troubleshooting--imou-engineering-notes)
+10. [Author](#author)
 
 ---
 
-## 🏗️ Problem Statement & System Architecture
+## Problem Statement & System Architecture
 
 ### Why a Decoupled Proxy Architecture?
 1. **Browser Protocol Limitation:** Modern browsers (Chrome, Edge, Firefox) cannot natively render raw **RTSP** (`port 554`) streams.
