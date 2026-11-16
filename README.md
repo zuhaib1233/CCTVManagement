@@ -115,10 +115,10 @@ Next, update `appsettings.json` with your SQL Server connection string and list 
     "HlsBaseUrl": "http://localhost:8888"
   },
   "CameraDefaults": {
-    "DefaultSafetyCode": "L2A54EB0",
+    "DefaultSafetyCode": "xxxxxxx",
     "SafetyCodes": [
-      "L2A54EB0",
-      "L2C4B3C8"
+      "xxxxxxx",
+      "xxxxxxx"
     ]
   }
 }
