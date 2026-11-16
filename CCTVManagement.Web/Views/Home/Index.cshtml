@@ -1,0 +1,203 @@
+﻿@{
+    ViewData["Title"] = "CCTV Operations Panel";
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">CCTV Operations Panel</h2>
+        <div class="d-flex align-items-center gap-2">
+            <button id="btnAutoDiscover" class="btn btn-primary" onclick="triggerAutoConfigure()">
+                🔍 Auto Discover & Configure
+            </button>
+            <span id="globalStatus" class="badge bg-success px-3 py-2">LIVE WALL</span>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Left: Stacked Multi-Camera Live Wall -->
+        <div class="col-lg-8 mb-3">
+            <div id="cameraWallContainer" class="d-flex flex-column gap-3"></div>
+        </div>
+
+        <!-- Right: Add New Camera -->
+        <div class="col-lg-4">
+            <div class="card border-primary mb-3 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title text-primary">Add / Connect Camera</h5>
+                    <p class="text-muted small">Naya camera add karein — chalta hua camera blink nahi hoga.</p>
+
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold">Camera IP Address</label>
+                        <input type="text" id="manualIp" class="form-control" value="192.168.18.241" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Safety Code (Sticker)</label>
+                        <input type="text" id="manualCode" class="form-control" value="L2C4B3C8" />
+                    </div>
+                    <button class="btn btn-primary w-100" onclick="connectManualCamera()">
+                        ➕ Add to Live Wall
+                    </button>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="card-title">Registered Cameras Reference</h6>
+                    <ul class="small text-muted mb-0 ps-3">
+                        <li><strong>Cam 1 (IPC-A42D):</strong> <code>192.168.18.228</code> / <code>L2A54EB0</code></li>
+                        <li><strong>Cam 2 (IPC-S41FP):</strong> <code>192.168.18.241</code> / <code>L2C4B3C8</code></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+    const hlsInstances = {};
+    const retryTimers = {};
+
+    async function loadCameraWall() {
+        const res = await fetch('/api/cameras');
+        const cameras = await res.json();
+        const container = document.getElementById('cameraWallContainer');
+
+        if (!cameras || cameras.length === 0) {
+            container.innerHTML = `<div id="emptyAlert" class="alert alert-secondary">Koi camera registered nahi hai.</div>`;
+            return;
+        }
+
+        const emptyAlert = document.getElementById('emptyAlert');
+        if (emptyAlert) emptyAlert.remove();
+
+        cameras.forEach(cam => {
+            const camId = cam.id || cam.Id;
+            // Agar ye camera card pehle se screen par mojood hai to usay reload/blink mat karein
+            if (document.getElementById(`card_${camId}`)) return;
+
+            const camName = cam.name || cam.Name || camId;
+            const camIp = cam.ipAddress || cam.IpAddress || '';
+
+            const cardHtml = `
+                <div id="card_${camId}" class="card bg-dark text-white border-0 shadow">
+                    <div class="card-header d-flex justify-content-between align-items-center py-2">
+                        <span class="fw-bold">📹 ${camName} <small class="text-secondary">(${camIp})</small></span>
+                        <div class="d-flex align-items-center gap-2">
+                            <span id="badge_${camId}" class="badge bg-warning text-dark">CONNECTING...</span>
+                            <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteCamera('${camId}')" title="Remove Camera">🗑️</button>
+                        </div>
+                    </div>
+                    <div class="card-body p-2">
+                        <video id="player_${camId}" class="w-100 rounded" style="max-height: 420px; background: #000;" controls autoplay muted playsinline></video>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', cardHtml);
+            startStreamForCamera(camId);
+        });
+    }
+
+    function startStreamForCamera(camId) {
+        if (retryTimers[camId]) clearTimeout(retryTimers[camId]);
+
+        const video = document.getElementById(`player_${camId}`);
+        const badge = document.getElementById(`badge_${camId}`);
+        if (!video) return;
+
+        const streamUrl = `http://localhost:8888/${camId}/index.m3u8`;
+
+        if (hlsInstances[camId]) {
+            hlsInstances[camId].destroy();
+        }
+
+        if (Hls.isSupported()) {
+            const hls = new Hls({
+                lowLatencyMode: false,
+                liveSyncDurationCount: 3,
+                liveMaxLatencyDurationCount: 8,
+                maxBufferLength: 10,
+                backBufferLength: 10,
+                enableWorker: true
+            });
+
+            hlsInstances[camId] = hls;
+            hls.loadSource(streamUrl);
+            hls.attachMedia(video);
+
+            hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                if (badge) {
+                    badge.className = 'badge bg-success';
+                    badge.innerText = 'ONLINE';
+                }
+                video.play().catch(err => console.warn('Autoplay blocked:', err));
+            });
+
+            hls.on(Hls.Events.ERROR, function (event, data) {
+                if (data.fatal) {
+                    if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                        hls.recoverMediaError();
+                    } else {
+                        if (badge) {
+                            badge.className = 'badge bg-warning text-dark';
+                            badge.innerText = 'RECONNECTING...';
+                        }
+                        retryTimers[camId] = setTimeout(() => startStreamForCamera(camId), 3000);
+                    }
+                }
+            });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = streamUrl;
+            video.addEventListener('loadedmetadata', () => video.play());
+        }
+    }
+
+    async function connectManualCamera() {
+        const ip = encodeURIComponent(document.getElementById('manualIp').value.trim());
+        const code = encodeURIComponent(document.getElementById('manualCode').value.trim());
+
+        const res = await fetch(`/api/cameras/add-manual?ip=${ip}&safetyCode=${code}`, {
+            method: 'POST'
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            await loadCameraWall();
+            // Sirf is naye/updated camera ki stream ko restart karein, baqi players ko nahi
+            if (data.cameraId) {
+                setTimeout(() => startStreamForCamera(data.cameraId), 1500);
+            }
+        } else {
+            alert('Camera connect karne mein masla aaya.');
+        }
+    }
+
+    async function triggerAutoConfigure() {
+        const btn = document.getElementById('btnAutoDiscover');
+        btn.disabled = true;
+        try {
+            await fetch('/api/cameras/auto-configure', { method: 'POST' });
+            await loadCameraWall();
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function deleteCamera(camId) {
+        if (!confirm('Is camera ko wall se remove karein?')) return;
+        const res = await fetch(`/api/cameras/${camId}`, { method: 'DELETE' });
+        if (res.ok) {
+            if (hlsInstances[camId]) {
+                hlsInstances[camId].destroy();
+                delete hlsInstances[camId];
+            }
+            if (retryTimers[camId]) clearTimeout(retryTimers[camId]);
+            const card = document.getElementById(`card_${camId}`);
+            if (card) card.remove();
+        }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        loadCameraWall();
+    });
+</script>
